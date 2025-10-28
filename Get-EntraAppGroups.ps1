@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Gets all groups assigned to a specific Enterprise Application in Microsoft Entra ID
-    and exports the group name and object ID to a CSV file.
+    Gets all groups assigned to a specific Enterprise Application in Microsoft Entra ID,
+    filters out empty groups, and exports the group name and object ID to a CSV file.
 
 .DESCRIPTION
     This script requires the Microsoft.Graph module.
@@ -10,8 +10,9 @@
     3. It finds the Service Principal for that application.
     4. It retrieves all app role assignments for the Service Principal.
     5. It filters for assignments that are groups.
-    6. It creates custom objects with the Group Name and Group Object ID.
-    7. It exports this list to a CSV file.
+    6. It checks if those groups have members and filters out empty groups.
+    7. It creates custom objects with the Group Name and Group Object ID for non-empty groups.
+    8. It exports this list to a CSV file.
 
 .PARAMETER AppObjectId
     The Object ID (Service Principal ID) of the Enterprise Application in Microsoft Entra ID.
@@ -21,7 +22,7 @@
 
 .EXAMPLE
     .\get_app_groups.ps1 -AppObjectId "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890" -ExportPath "C:\temp\AppGroups.csv"
-    This command will find the application with the specified Object ID, get all assigned groups,
+    This command will find the application with the specified Object ID, get all assigned groups that have members,
     and save their names and IDs to "C:\temp\AppGroups.csv".
 #>
 
@@ -49,7 +50,7 @@ if (-not $module) {
 }
 
 # Define required permissions
-$scopes = @("Application.Read.All", "Group.Read.All", "AppRoleAssignment.ReadWrite.All")
+$scopes = @("Application.Read.All", "Group.Read.All", "AppRoleAssignment.ReadWrite.All", "GroupMember.Read.All")
 
 # Connect to Microsoft Graph
 try {
@@ -89,18 +90,31 @@ try {
     foreach ($assignment in $appAssignments) {
         # Filter for assignments that are groups
         if ($assignment.PrincipalType -eq "Group") {
-            Write-Host "Found assigned group. Principal ID: $($assignment.PrincipalId)"
+            Write-Host "Found assigned group: $($assignment.PrincipalDisplayName) (ID: $($assignment.PrincipalId))"
             
-            # Add the group details to our list
-            $groupAssignments += [PSCustomObject]@{
-                GroupName   = $assignment.PrincipalDisplayName
-                GroupObjectId = $assignment.PrincipalId
+            try {
+                # Check if the group has at least one member. -Top 1 is most efficient.
+                $members = Get-MgGroupMember -GroupId $assignment.PrincipalId -Top 1
+                
+                if ($members) {
+                    Write-Host "--> Group has members. Adding to list."
+                    # Add the group details to our list
+                    $groupAssignments += [PSCustomObject]@{
+                        GroupName   = $assignment.PrincipalDisplayName
+                        GroupObjectId = $assignment.PrincipalId
+                    }
+                } else {
+                    Write-Host "--> Group has no members. Skipping."
+                }
+            }
+            catch {
+                Write-Warning "--> Failed to check members for group $($assignment.PrincipalDisplayName). Error: $_. Skipping group."
             }
         }
     }
 
     if ($groupAssignments.Count -eq 0) {
-        Write-Warning "No *groups* are assigned to this application."
+        Write-Warning "No *groups with members* are assigned to this application."
         return
     }
 
