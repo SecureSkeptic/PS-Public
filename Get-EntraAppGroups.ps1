@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Gets all groups assigned to a specific Enterprise Application in Microsoft Entra ID,
-    filters out empty groups, and exports the group name and object ID to a CSV file.
+    filters out empty groups, and exports the group name, object ID, and creation date to a CSV file.
 
 .DESCRIPTION
     This script requires the Microsoft.Graph module.
@@ -11,7 +11,7 @@
     4. It retrieves all app role assignments for the Service Principal.
     5. It filters for assignments that are groups.
     6. It checks if those groups have members and filters out empty groups.
-    7. It creates custom objects with the Group Name and Group Object ID for non-empty groups.
+    7. It creates custom objects with the Group Name, Group Object ID, and GroupCreatedDate for non-empty groups.
     8. It exports this list to a CSV file.
 
 .PARAMETER AppObjectId
@@ -23,7 +23,7 @@
 .EXAMPLE
     .\get_app_groups.ps1 -AppObjectId "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890" -ExportPath "C:\temp\AppGroups.csv"
     This command will find the application with the specified Object ID, get all assigned groups that have members,
-    and save their names and IDs to "C:\temp\AppGroups.csv".
+    and save their names, IDs, and creation dates to "C:\temp\AppGroups.csv".
 #>
 
 param (
@@ -93,22 +93,32 @@ try {
             Write-Host "Found assigned group: $($assignment.PrincipalDisplayName) (ID: $($assignment.PrincipalId))"
             
             try {
+                # Get the full group object to access its CreatedDateTime property
+                # Selecting specific properties is more efficient
+                $group = Get-MgGroup -GroupId $assignment.PrincipalId -Property "id", "displayName", "createdDateTime"
+                
+                if (-not $group) {
+                    Write-Warning "--> Could not retrieve details for group ID $($assignment.PrincipalId). Skipping."
+                    continue
+                }
+
                 # Check if the group has at least one member. -Top 1 is most efficient.
-                $members = Get-MgGroupMember -GroupId $assignment.PrincipalId -Top 1
+                $members = Get-MgGroupMember -GroupId $group.Id -Top 1
                 
                 if ($members) {
                     Write-Host "--> Group has members. Adding to list."
                     # Add the group details to our list
                     $groupAssignments += [PSCustomObject]@{
-                        GroupName   = $assignment.PrincipalDisplayName
-                        GroupObjectId = $assignment.PrincipalId
+                        GroupName        = $group.DisplayName
+                        GroupObjectId    = $group.Id
+                        GroupCreatedDate = $group.CreatedDateTime
                     }
                 } else {
                     Write-Host "--> Group has no members. Skipping."
                 }
             }
             catch {
-                Write-Warning "--> Failed to check members for group $($assignment.PrincipalDisplayName). Error: $_. Skipping group."
+                Write-Warning "--> Failed to process group $($assignment.PrincipalDisplayName). Error: $_. Skipping group."
             }
         }
     }
