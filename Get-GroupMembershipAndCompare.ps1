@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-    Compares Entra ID group membership from a CSV list against two specific groups.
+    Gets members from a list of imported groups and two specified groups.
 
 .DESCRIPTION
     This script reads a list of group names from an input CSV. It finds all unique
-    members across all those groups.
+    members across all those groups (List A).
     
-    It also gets all unique members from two specified "compare" groups (e.g., "All Staff"
-    and "External Users").
+    It also gets all unique members from two specified "compare" groups (List B).
     
-    It then generates an output CSV with two columns:
-    1. AllImportedMembers: A unique list of all users found in the imported groups.
-    2. InCompareGroups:    Shows the user's UPN *if* they were also found in one of
-                           the two compare groups. This column is blank otherwise.
+    It then generates an output CSV with two columns, side-by-side:
+    1. ImportedGroupMembers: All unique members from the imported groups.
+    2. CompareGroupMembers:  All unique members from the two compare groups.
+    
+    The lists are independent and not compared against each other.
 
 .NOTES
     Requires the Microsoft.Graph.Groups module.
@@ -31,9 +31,9 @@ $inputCsvPath = "C:\temp\groups-to-check.csv"
 $groupColumnName = "GroupName"
 
 # The path for the final report.
-$outputCsvPath = "C:\temp\MembershipComparison.csv"
+$outputCsvPath = "C:\temp\GroupLists.csv"
 
-# The display names of the two specific groups you want to compare against.
+# The display names of the two specific groups you want to list.
 $compareGroupNameA = "All Staff"
 $compareGroupNameB = "IT Department"
 
@@ -57,7 +57,7 @@ if (-not (Get-MgContext)) {
 
 Write-Host "Fetching members from compare groups ($compareGroupNameA, $compareGroupNameB)..." -ForegroundColor Green
 
-# A HashSet provides very fast lookups (e.g., .Contains())
+# A HashSet ensures all members are unique
 $compareMembersHashSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::InvariantCultureIgnoreCase)
 
 foreach ($groupName in @($compareGroupNameA, $compareGroupNameB)) {
@@ -79,8 +79,6 @@ foreach ($groupName in @($compareGroupNameA, $compareGroupNameB)) {
 }
 Write-Host "Found $($compareMembersHashSet.Count) unique members in compare groups."
 
----
-
 # --- 4. Get Members from Imported Groups (from CSV) ---
 
 Write-Host "Processing groups from input CSV ($inputCsvPath)..." -ForegroundColor Green
@@ -90,6 +88,7 @@ if (-not (Test-Path $inputCsvPath)) {
 }
 
 $groupsToProcess = Import-Csv -Path $inputCsvPath
+# A HashSet ensures all members are unique
 $allImportedMembersHashSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::InvariantCultureIgnoreCase)
 
 foreach ($row in $groupsToProcess) {
@@ -114,26 +113,43 @@ foreach ($row in $groupsToProcess) {
 }
 Write-Host "Found $($allImportedMembersHashSet.Count) unique members across all imported groups."
 
----
+# --- 5. Combine Lists and Build Report ---
 
-# --- 5. Compare Lists and Build Report ---
+Write-Host "Combining lists for report..." -ForegroundColor Green
 
-Write-Host "Comparing memberships and building report..." -ForegroundColor Green
-$outputData = foreach ($upn in $allImportedMembersHashSet) {
+# Convert HashSets to Lists for indexed access
+$importedList = [System.Collections.Generic.List[string]]::new($allImportedMembersHashSet)
+$compareList = [System.Collections.Generic.List[string]]::new($compareMembersHashSet)
+
+# Sort the lists alphabetically
+$importedList.Sort()
+$compareList.Sort()
+
+# Find the length of the longer list to set the number of rows
+$maxRows = [System.Math]::Max($importedList.Count, $compareList.Count)
+$outputData = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+for ($i = 0; $i -lt $maxRows; $i++) {
     
-    # This will be the value for the second column
-    $inCompareGroup = $null 
+    # Get the member for column 1, or $null if the list is shorter
+    $importedMember = $null
+    if ($i -lt $importedList.Count) {
+        $importedMember = $importedList[$i]
+    }
     
-    # Check if this UPN exists in our fast lookup list
-    if ($compareMembersHashSet.Contains($upn)) {
-        $inCompareGroup = $upn
+    # Get the member for column 2, or $null if the list is shorter
+    $compareMember = $null
+    if ($i -lt $compareList.Count) {
+        $compareMember = $compareList[$i]
     }
     
     # Create the custom object for the CSV row
-    [PSCustomObject]@{
-        AllImportedMembers = $upn
-        InCompareGroups    = $inCompareGroup
-    }
+    $outputData.Add(
+        [PSCustomObject]@{
+            ImportedGroupMembers = $importedMember
+            CompareGroupMembers  = $compareMember
+        }
+    )
 }
 
 # --- 6. Export to CSV ---
