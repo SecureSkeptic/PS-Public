@@ -1,19 +1,19 @@
 <#
 .SYNOPSIS
     Gets members from a list of imported groups and two specified groups.
+    This version includes members from NESTED groups (transitive members).
 
 .DESCRIPTION
     This script reads a list of group names from an input CSV. It finds all unique
-    members across all those groups (List A).
+    members across all those groups, including members of nested groups (List A).
     
-    It also gets all unique members from two specified "compare" groups (List B).
+    It also gets all unique members from two specified "compare" groups,
+    including members of nested groups (List B).
     
     It then generates an output CSV with two columns, side-by-side:
     1. ImportedGroupMembers: All unique members from the imported groups.
     2. CompareGroupMembers:  All unique members from the two compare groups.
     
-    The lists are independent and not compared against each other.
-
 .NOTES
     Requires the Microsoft.Graph.Groups module.
     Install with: Install-Module Microsoft.Graph.Groups
@@ -64,9 +64,11 @@ foreach ($groupName in @($compareGroupNameA, $compareGroupNameB)) {
     try {
         $group = Get-MgGroup -Filter "displayName eq '$groupName'" -ErrorAction Stop
         if ($group) {
-            Write-Host " - Found compare group '$groupName'"
-            # Get members that are users and add their UserPrincipalName to the HashSet
-            $members = Get-MgGroupMember -GroupId $group.Id -All | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }
+            Write-Host " - Found compare group '$groupName' (getting transitive members...)"
+            
+            # CHANGED: Use Get-MgGroupTransitiveMember to include nested group members
+            $members = Get-MgGroupTransitiveMember -GroupId $group.Id -All | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }
+            
             foreach ($member in $members) {
                 $compareMembersHashSet.Add($member.AdditionalProperties.userPrincipalName)
             }
@@ -98,9 +100,11 @@ foreach ($row in $groupsToProcess) {
     try {
         $group = Get-MgGroup -Filter "displayName eq '$groupName'" -ErrorAction Stop
         if ($group) {
-            Write-Host " - Getting members for '$groupName'..."
-            # Get members that are users and add their UPN to the other HashSet
-            $members = Get-MgGroupMember -GroupId $group.Id -All | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }
+            Write-Host " - Getting members for '$groupName' (getting transitive members...)"
+            
+            # CHANGED: Use Get-MgGroupTransitiveMember to include nested group members
+            $members = Get-MgGroupTransitiveMember -GroupId $group.Id -All | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }
+            
             foreach ($member in $members) {
                 $allImportedMembersHashSet.Add($member.AdditionalProperties.userPrincipalName)
             }
