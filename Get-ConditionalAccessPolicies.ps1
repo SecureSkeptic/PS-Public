@@ -111,7 +111,7 @@ $ExportData = foreach ($Policy in $Policies) {
     # Parse Controls
     $GrantControls   = $Policy.GrantControls.BuiltInControls -join "; "
     $SessionControls = if ($Policy.SessionControls) {
-        $Policy.SessionControls.PSObject.Properties | Where-Object { $_.Value.IsEnabled -eq $true } | Select-Object -ExpandProperty Name -join "; "
+        ($Policy.SessionControls.PSObject.Properties | Where-Object { $_.Value.IsEnabled -eq $true } | Select-Object -ExpandProperty Name) -join "; "
     } else { $null }
 
     # Construct the final object
