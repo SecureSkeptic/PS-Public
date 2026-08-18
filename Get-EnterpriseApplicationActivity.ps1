@@ -18,8 +18,9 @@ if (-not (Test-Path $exportDir)) { New-Item -ItemType Directory -Path $exportDir
 
 # 3. Retrieve all Enterprise Applications (Service Principals) configured for SAML
 Write-Host "Fetching SAML configured Enterprise Applications..." -ForegroundColor Cyan
-# PreferredSingleSignOnMode 'saml' indicates a SAML SSO configuration
-$samlApps = Get-MgServicePrincipal -All -Property "Id, DisplayName, AppId, PreferredSingleSignOnMode, KeyCredentials" | 
+
+# FIX: Formatted the -Property parameter as a proper array of strings
+$samlApps = Get-MgServicePrincipal -All -Property "Id", "DisplayName", "AppId", "PreferredSingleSignOnMode", "KeyCredentials" | 
     Where-Object { $_.PreferredSingleSignOnMode -eq "saml" }
 
 $report = @()
@@ -33,8 +34,9 @@ foreach ($app in $samlApps) {
     Write-Progress -Activity "Processing Applications" -Status "Checking $($app.DisplayName)" -PercentComplete (($counter / $totalApps) * 100)
     
     # --- Get SAML Signing Certificate Expiration ---
-    # SAML signing certs typically have a Usage of "Verify" or "Sign"
-    $certs = $app.KeyCredentials | Where-Object { $_.Usage -eq "Verify" }
+    # FIX: Check for both "Verify" and "Sign" usage to ensure the active cert is captured
+    $certs = $app.KeyCredentials | Where-Object { $_.Usage -match "Verify|Sign" }
+    
     if ($certs) {
         # If multiple certs exist (e.g., during rollover), grab the one with the furthest expiration date
         $certExpiration = ($certs | Sort-Object EndDateTime -Descending)[0].EndDateTime
