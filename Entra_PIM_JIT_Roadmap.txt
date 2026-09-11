@@ -1,0 +1,60 @@
+This executive roadmap outlines the strategy for implementing Just-In-Time (JIT) access for SSO-integrated applications using Entra ID Privileged Identity Management (PIM). By transitioning from standing privileges to time-bound, approved access via PIM for Groups or App Roles, this initiative directly advances the organization's Zero Trust architecture and reduces the blast radius of compromised credentials.
+
+This document is structured for immediate review and approval by the Entra team and ICAM leadership.
+
+## Critical Project Dependencies
+
+Successful implementation of JIT SSO requires coordinated effort across multiple business and technical units. The following dependencies must be aligned prior to pilot execution.
+
+| Stakeholder Group | Required Contribution / Dependency |
+| :--- | :--- |
+| **ICAM Leadership** | Strategic approval of the JIT workflow, policy enforcement mandates, and final sign-off on the roadmap and RACI. |
+| **Entra Engineering Team** | Configuration of PIM for Groups, Conditional Access policies, Enterprise App SAML/OIDC role mappings, and Tier 3 escalation support. |
+| **Cybersecurity (Cyber)** | Validation of security controls, definition of maximum activation durations (e.g., 2 vs. 4 hours), and MFA context requirements. |
+| **InfoSec & Compliance (ISC)** | Definition of audit logging requirements, compliance frameworks (e.g., NIST strictures), and mandatory Access Review configurations. |
+| **Application System Owners** | Active participation in requirements gathering, validation of application roles, and approval of the cutover from standing access to JIT. |
+| **Operations & Maintenance (O&M)** | Acceptance of the final runbooks, Tier 1/2 helpdesk readiness for PIM activation troubleshooting, and ongoing access monitoring. |
+
+---
+
+## JIT SSO Implementation Roadmap
+
+### Phase 1: Discovery, Outreach, & Requirements Gathering
+**Objective:** Identify target applications, establish baseline access models, and initiate stakeholder engagement.
+*   **Milestone 1.1: Application Inventory & Triage.** Identify all SSO-integrated enterprise applications in Entra ID currently utilizing standing privileged assignments. Categorize by criticality and risk.
+*   **Milestone 1.2: System Owner Outreach.** Initiate formal communications with System Owners detailing the transition from standing access to JIT, including the security drivers and expected user experience changes.
+*   **Milestone 1.3: Requirements Gathering.** Conduct working sessions with System Owners to map existing application roles to Entra ID Security Groups. Define required PIM settings for each application (e.g., require justification, ticket number, MFA, and designated approvers).
+*   **Milestone 1.4: Governance Definition.** Work with ISC and Cyber to establish global PIM policies, including maximum activation windows and recurring Access Review schedules.
+
+### Phase 2: Architecture, Design, & RACI Approval
+**Objective:** Finalize the technical design and operational responsibilities for ICAM leadership approval.
+*   **Milestone 2.1: Technical Architecture Design.** Document the technical flow using Entra ID *PIM for Groups*. Map out how users will activate the group in PIM, which in turn assigns the application role via Entra ID Enterprise Applications provisioning.
+*   **Milestone 2.2: Conditional Access Integration.** Design Conditional Access policies that enforce session controls (e.g., sign-in frequency, continuous access evaluation) upon JIT activation.
+*   **Milestone 2.3: RACI Matrix Development.** Draft a comprehensive RACI (Responsible, Accountable, Consulted, Informed) matrix covering onboarding, daily operations, approval workflows, and troubleshooting.
+*   **Milestone 2.4: Entra & ICAM Leadership Review.** Present the architecture, global policies, and RACI matrix to ICAM leadership and the Entra engineering team for formal approval.
+
+### Phase 3: Pre-Implementation Readiness
+**Objective:** Prepare the environment, validate technical controls, and ensure all support structures are in place prior to touching production data.
+*   **Milestone 3.1: Non-Production Proof of Concept (PoC).** Configure a test application with PIM for Groups JIT access in a non-production or isolated Entra tenant environment. Validate the end-to-end user experience.
+*   **Milestone 3.2: O&M Runbook & Documentation.** Draft standard operating procedures (SOPs) for the helpdesk, outlining how to troubleshoot PIM activation failures, sync delays, and SSO token refresh issues.
+*   **Milestone 3.3: End-User Communications Drafted.** Finalize training materials, quick-reference guides, and communications for the end-users who will be requesting access.
+*   **Milestone 3.4: Pilot Selection & Readiness Sign-off.** Select 2-3 low-to-medium risk applications for the initial pilot. Obtain System Owner and Cyber sign-off to proceed with execution.
+
+### Phase 4: Pilot Execution & Validation
+**Objective:** Roll out JIT SSO to the pilot applications, monitor behavior, and refine the process.
+*   **Milestone 4.1: Pilot Group Configuration.** Create the Entra ID Security Groups, assign them to the pilot Enterprise Applications, and configure the approved PIM settings.
+*   **Milestone 4.2: User Migration.** Add existing privileged users as *Eligible* members in PIM. Remove their standing *Active* assignments.
+*   **Milestone 4.3: Pilot Go-Live & Hypercare.** Monitor the pilot closely. Track successful activations, approval latency, and any SSO token caching issues (e.g., requiring users to sign out/in to refresh claims).
+*   **Milestone 4.4: Pilot Retrospective & Adjustment.** Gather feedback from the pilot users and System Owners. Adjust PIM configurations or support documentation as necessary.
+
+### Phase 5: Enterprise Phased Rollout
+**Objective:** Scale the JIT SSO model across the remaining application portfolio.
+*   **Milestone 5.1: Wave 1 Rollout (Medium Risk).** Migrate the next batch of applications based on the established playbook.
+*   **Milestone 5.2: Wave 2 Rollout (High Risk / Tier 0 Apps).** Migrate highly sensitive applications, potentially introducing stricter PIM controls (e.g., multiple approvers, strict ticketing integration).
+*   **Milestone 5.3: Deprecation of Standing Access.** Conduct a final audit across the enterprise applications to ensure no standing privileged access remains outside of break-glass emergency accounts.
+
+### Phase 6: Operational Handoff & Continuous Auditing
+**Objective:** Transition the project to standard operations and enforce continuous compliance.
+*   **Milestone 6.1: Access Reviews Deployment.** Automate Entra ID Access Reviews for all PIM-enabled JIT groups to ensure eligible access is recertified quarterly or bi-annually.
+*   **Milestone 6.2: Final O&M Transition.** Formally transition ongoing support, group management, and approver updates to the O&M and Service Desk teams.
+*   **Milestone 6.3: Project Closure.** Present final deployment metrics, security posture improvements, and lessons learned to ICAM leadership.
