@@ -1,4 +1,5 @@
 SigninLogs
+| where TimeGenerated >= ago(180d)
 // Pre-filter the dataset for performance before expanding
 | where ConditionalAccessPolicies has "Your-Policy-Name-Here"
 | mv-expand Policy = ConditionalAccessPolicies
