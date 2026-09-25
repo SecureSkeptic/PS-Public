@@ -1,0 +1,30 @@
+SigninLogs
+// Pre-filter the dataset for performance before expanding
+| where ConditionalAccessPolicies has "Your-Policy-Name-Here"
+| mv-expand Policy = ConditionalAccessPolicies
+// Ensure exact match on the display name
+| where Policy.displayName == "Your-Policy-Name-Here"
+| project 
+    TimeGenerated,
+    UserPrincipalName,
+    AppDisplayName,
+    IPAddress,
+    LocationDetails = Location,
+    ClientAppUsed = ClientAppUsed,
+    PolicyName = Policy.displayName,
+    PolicyResult = Policy.result,
+    SignInStatus = ResultType,
+    FailureReason = ResultDescription
+| sort by TimeGenerated desc
+
+
+
+
+To find where the policy explicitly blocked or failed the user:
+| where Policy.result == "failure"
+
+To audit a policy in Report-Only mode:
+| where Policy.result in ("reportOnlyFailure", "reportOnlySuccess")
+
+To find where the policy successfully applied (e.g., MFA was satisfied):
+| where Policy.result == "success"
