@@ -2,7 +2,7 @@
 # Script: Remove-EntraGroupMembers.ps1
 # Description: Removes users from Entra ID groups based on a CSV file.
 # Required CSV Headers: GroupObjectID, UPN
-# Example: .\Remove-EntraGroupMembers.ps1 -CsvPath "C:\temp\GroupRemovals.csv" -LogPath "C:\temp\MyCustomLog.txt" 
+# Example: .\Remove-EntraGroupMembers.ps1 -CsvPath "C:\temp\GroupRemovals.csv" -LogPath "C:\temp\MyCustomLog.txt" -TestMode true
 #          .\Remove-EntraGroupMembers.ps1 -CsvPath "C:\temp\GroupRemovals.csv"
 # ==============================================================================
 
@@ -13,7 +13,10 @@ param (
     [string]$CsvPath,
 
     [Parameter(Mandatory = $false, HelpMessage = "Path to output the log file")]
-    [string]$LogPath = ".\GroupRemovals_Log.txt"
+    [string]$LogPath = ".\GroupRemovals_Log.txt",
+
+    [Parameter(Mandatory = $false, HelpMessage = "Run the script without making actual changes")]
+    [switch]$TestMode
 )
 
 # Helper function for logging
@@ -25,8 +28,12 @@ function Write-Log {
     $LogLine | Out-File -FilePath $LogPath -Append
 }
 
-# Clear previous log if desired (Optional)
+# Clear previous log if desired
 if (Test-Path $LogPath) { Remove-Item $LogPath }
+
+if ($TestMode) {
+    Write-Log "--- STARTING SCRIPT IN TEST MODE: No changes will be made to Entra ID ---"
+}
 
 # Ensure CSV exists
 if (-not (Test-Path $CsvPath)) {
@@ -60,16 +67,25 @@ foreach ($row in $csvData) {
     }
 
     try {
-        # Graph API requires the User Object ID to modify group membership, so we fetch the user by UPN first
+        # Fetch the user by UPN first to ensure they exist (Runs in both modes)
         $user = Get-MgUser -UserId $upn -ErrorAction Stop
         
-        # Remove the user from the group
-        Remove-MgGroupMemberByRef -GroupId $groupObjId -DirectoryObjectId $user.Id -ErrorAction Stop
-        
-        Write-Log "SUCCESS: Removed user '$upn' from group '$groupObjId'."
+        if ($TestMode) {
+            # Skip the actual removal, but log the intended action
+            Write-Log "TEST MODE (SUCCESS): Would have removed user '$upn' from group '$groupObjId'."
+        } else {
+            # Remove the user from the group
+            Remove-MgGroupMemberByRef -GroupId $groupObjId -DirectoryObjectId $user.Id -ErrorAction Stop
+            Write-Log "SUCCESS: Removed user '$upn' from group '$groupObjId'."
+        }
     }
     catch {
-        Write-Log "FAILURE: Could not remove user '$upn' from group '$groupObjId'. Error: $($_.Exception.Message)"
+        $errorMsg = $_.Exception.Message
+        if ($TestMode) {
+            Write-Log "TEST MODE (FAILURE): User '$upn' or group '$groupObjId' could not be resolved/modified. Error: $errorMsg"
+        } else {
+            Write-Log "FAILURE: Could not remove user '$upn' from group '$groupObjId'. Error: $errorMsg"
+        }
     }
 }
 
