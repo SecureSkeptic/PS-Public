@@ -67,14 +67,25 @@ foreach ($row in $csvData) {
     }
 
     try {
-        # Fetch the user by UPN first to ensure they exist (Runs in both modes)
+        # 1. Fetch the user by UPN first to ensure they exist
         $user = Get-MgUser -UserId $upn -ErrorAction Stop
         
+        # 2. Check if the user is actually a member of the group
+        $isMember = Get-MgGroupMember -GroupId $groupObjId -All -ErrorAction Stop | Where-Object { $_.Id -eq $user.Id }
+
+        if (-not $isMember) {
+            if ($TestMode) {
+                Write-Log "TEST MODE (SKIPPED): User '$upn' is not in group '$groupObjId'. No action needed."
+            } else {
+                Write-Log "SKIPPED: User '$upn' is not in group '$groupObjId'. No action needed."
+            }
+            continue
+        }
+        
+        # 3. User is in the group, proceed with intended action
         if ($TestMode) {
-            # Skip the actual removal, but log the intended action
             Write-Log "TEST MODE (SUCCESS): Would have removed user '$upn' from group '$groupObjId'."
         } else {
-            # Remove the user from the group
             Remove-MgGroupMemberByRef -GroupId $groupObjId -DirectoryObjectId $user.Id -ErrorAction Stop
             Write-Log "SUCCESS: Removed user '$upn' from group '$groupObjId'."
         }
@@ -82,9 +93,9 @@ foreach ($row in $csvData) {
     catch {
         $errorMsg = $_.Exception.Message
         if ($TestMode) {
-            Write-Log "TEST MODE (FAILURE): User '$upn' or group '$groupObjId' could not be resolved/modified. Error: $errorMsg"
+            Write-Log "TEST MODE (FAILURE): Could not process user '$upn' or group '$groupObjId'. Error: $errorMsg"
         } else {
-            Write-Log "FAILURE: Could not remove user '$upn' from group '$groupObjId'. Error: $errorMsg"
+            Write-Log "FAILURE: Could not process user '$upn' or group '$groupObjId'. Error: $errorMsg"
         }
     }
 }
